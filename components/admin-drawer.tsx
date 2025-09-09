@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Settings, Clock, Play, RefreshCw, CheckCircle, AlertCircle } from "lucide-react"
+import { toast } from "sonner"
 
 interface AdminDrawerProps {
   children: React.ReactNode
@@ -67,13 +68,13 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
       const result = await response.json()
 
       if (result.success) {
-        alert("¡Automatización configurada exitosamente!")
+        toast.success("¡Automatización configurada exitosamente!")
         setLastResult(result)
       } else {
-        alert(`Error: ${result.error}`)
+        toast.error(`Error: ${result.error}`)
       }
     } catch (error) {
-      alert("Error al configurar la automatización")
+      toast.error("Error al configurar la automatización")
       console.error(error)
     } finally {
       setIsSettingUp(false)
@@ -87,13 +88,13 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
       const result = await response.json()
 
       if (result.success) {
-        alert(`Verificación completada: ${result.message}`)
+        toast.success(`Verificación completada: ${result.message}`)
         setLastResult(result)
       } else {
-        alert(`Error: ${result.error}`)
+        toast.error(`Error: ${result.error}`)
       }
     } catch (error) {
-      alert("Error en la verificación")
+      toast.error("Error en la verificación")
       console.error(error)
     } finally {
       setIsRunning(false)
@@ -115,9 +116,9 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
         description: "How often to check for inactive clients",
       })
 
-      alert("Configuración actualizada exitosamente!")
+      toast.success("Configuración actualizada exitosamente!")
     } catch (error) {
-      alert("Error al actualizar la configuración")
+      toast.error("Error al actualizar la configuración")
       console.error(error)
     } finally {
       setIsUpdatingConfig(false)

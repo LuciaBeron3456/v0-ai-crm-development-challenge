@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Filter, Users, UserCheck, UserX, Clock, ArrowUp, ArrowDown, Settings } from "lucide-react"
+import { toast } from "sonner"
 import { ClientList } from "./client-list"
 import { ClientListSkeleton } from "./client-list-skeleton"
 import { AddClientDialog } from "./add-client-dialog"
@@ -153,7 +154,7 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
       })
     } catch (error) {
       console.error("Error adding client:", error)
-      alert("Error al agregar cliente")
+      toast.error("Error al agregar cliente")
     }
   }
 
@@ -175,7 +176,7 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
       })
     } catch (error) {
       console.error("Error updating client:", error)
-      alert("Error al actualizar cliente")
+      toast.error("Error al actualizar cliente")
     }
   }
 

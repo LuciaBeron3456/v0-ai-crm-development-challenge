@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Settings, Clock, Play, RefreshCw, CheckCircle, AlertCircle } from "lucide-react"
 import { SeedDataPanel } from "./seed-data-panel"
+import { toast } from "sonner"
 
 export function AdminPanel() {
   const [isSettingUp, setIsSettingUp] = useState(false)
@@ -60,13 +61,13 @@ export function AdminPanel() {
       const result = await response.json()
 
       if (result.success) {
-        alert("¡Automatización configurada exitosamente!")
+        toast.success("¡Automatización configurada exitosamente!")
         setLastResult(result)
       } else {
-        alert(`Error: ${result.error}`)
+        toast.error(`Error: ${result.error}`)
       }
     } catch (error) {
-      alert("Error al configurar la automatización")
+      toast.error("Error al configurar la automatización")
       console.error(error)
     } finally {
       setIsSettingUp(false)
@@ -80,13 +81,13 @@ export function AdminPanel() {
       const result = await response.json()
 
       if (result.success) {
-        alert(`Verificación completada: ${result.message}`)
+        toast.success(`Verificación completada: ${result.message}`)
         setLastResult(result)
       } else {
-        alert(`Error: ${result.error}`)
+        toast.error(`Error: ${result.error}`)
       }
     } catch (error) {
-      alert("Error en la verificación")
+      toast.error("Error en la verificación")
       console.error(error)
     } finally {
       setIsRunning(false)
@@ -128,9 +129,9 @@ export function AdminPanel() {
         }
       }
 
-      alert("Configuración actualizada exitosamente!")
+      toast.success("Configuración actualizada exitosamente!")
     } catch (error) {
-      alert("Error al actualizar la configuración")
+      toast.error("Error al actualizar la configuración")
       console.error(error)
     } finally {
       setIsUpdatingConfig(false)
@@ -139,7 +140,6 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-2">
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -226,9 +226,11 @@ export function AdminPanel() {
               )}
             </Button>
           </div>
+        </CardContent>
 
-          <Separator />
+        <Separator />
 
+        <CardContent>
           <div className="space-y-4">
             <h3 className="font-semibold">Probar ahora</h3>
             <p className="text-sm text-muted-foreground">
@@ -248,11 +250,13 @@ export function AdminPanel() {
               )}
             </Button>
           </div>
+        </CardContent>
 
-          {/* Last Result */}
-          {lastResult && (
-            <>
-              <Separator />
+        {/* Last Result */}
+        {lastResult && (
+          <>
+            <Separator />
+            <CardContent>
               <div className="space-y-2">
                 <h3 className="font-semibold flex items-center gap-2">
                   {lastResult.success ? (
@@ -279,9 +283,9 @@ export function AdminPanel() {
                   </CardContent>
                 </Card>
               </div>
-            </>
-          )}
-        </CardContent>
+            </CardContent>
+          </>
+        )}
       </Card>
 
       <Card>

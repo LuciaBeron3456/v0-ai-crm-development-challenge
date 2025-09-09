@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Client, ClientStatus } from "./client-dashboard"
+import { toast } from "sonner"
 
 interface AddClientDialogProps {
   open: boolean
@@ -27,7 +28,7 @@ export function AddClientDialog({ open, onOpenChange, onAddClient }: AddClientDi
     e.preventDefault()
 
     if (!formData.nombre.trim() || !formData.telefono.trim()) {
-      alert("Por favor completa todos los campos requeridos")
+      toast.error("Por favor completa todos los campos requeridos")
       return
     }
 

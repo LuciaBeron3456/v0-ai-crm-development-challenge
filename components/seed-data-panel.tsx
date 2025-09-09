@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Database, Trash2, Seedling, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 
 export function SeedDataPanel() {
   const [isSeeding, setIsSeeding] = useState(false)
@@ -22,10 +23,10 @@ export function SeedDataPanel() {
 
       const result = await response.json()
       setLastResult(result)
-      alert("✅ Datos de prueba creados exitosamente!")
+      toast.success("✅ Datos de prueba creados exitosamente!")
     } catch (error) {
       console.error("Error:", error)
-      alert("❌ Error creando datos de prueba")
+      toast.error("❌ Error creando datos de prueba")
     } finally {
       setIsSeeding(false)
     }
@@ -46,10 +47,10 @@ export function SeedDataPanel() {
 
       const result = await response.json()
       setLastResult(result)
-      alert("✅ Todos los datos han sido eliminados")
+      toast.success("✅ Todos los datos han sido eliminados")
     } catch (error) {
       console.error("Error:", error)
-      alert("❌ Error eliminando datos")
+      toast.error("❌ Error eliminando datos")
     } finally {
       setIsClearing(false)
     }

@@ -21,6 +21,7 @@ import {
   MessageSquarePlus,
   Edit,
   MoreHorizontal,
+  Brain,
 } from "lucide-react"
 import type { Client, ClientStatus, ClientPriority } from "./client-dashboard"
 import { AIAnalysisDialog } from "./ai-analysis-dialog"
@@ -215,7 +216,7 @@ export function ClientList({
       setAnalysisClient(client)
     } catch (error) {
       console.error("Error:", error)
-      alert("Error al analizar cliente. Intenta nuevamente.")
+      toast.error("Error al analizar cliente. Intenta nuevamente.")
     } finally {
       setLoadingAnalysis(null)
     }
@@ -223,6 +224,10 @@ export function ClientList({
 
   const handleAutoCategorize = async (client: Client) => {
     setLoadingCategorize(client.id)
+    toast.info("Analizando cliente", {
+      description: "Actualizando estado automáticamente...",
+      duration: 3000,
+    })
     try {
       const response = await fetch("/api/ai/categorize-client", {
         method: "POST",
@@ -292,7 +297,7 @@ export function ClientList({
       })
     } catch (error) {
       console.error("Error adding interaction:", error)
-      alert("Error al agregar interacción")
+      toast.error("Error al agregar interacción")
     }
 
     setInteractionDescription("")
@@ -631,19 +636,27 @@ export function ClientList({
                     </DialogContent>
                   </Dialog>
 
-                  {/* Edit Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setEditClient(client)
-                    }}
-                        className="text-gray-600 border-gray-200 hover:bg-gray-50 h-8 px-2"
+                  {/* AI Analysis Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenAIAnalysis(client)
+                        }}
+                        className="text-purple-600 border-purple-200 hover:bg-purple-50 h-8 px-2"
                       >
-                        <Edit className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">Editar</span>
+                        <Brain className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">Analizar con IA</span>
                       </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Genera un análisis completo del cliente con IA</p>
+                      <p className="text-xs text-muted-foreground">Incluye recomendaciones de prioridad</p>
+                    </TooltipContent>
+                  </Tooltip>
 
                       {/* More Actions Dropdown */}
                       <DropdownMenu>
@@ -665,28 +678,6 @@ export function ClientList({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <DropdownMenuItem
-                                onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation()
-                        handleOpenAIAnalysis(client)
-                  }}
-                                className="cursor-pointer"
-                >
-                  {loadingAnalysis === client.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                  <Bot className="h-4 w-4 mr-2" />
-                                )}
-                                Analizar automáticamente
-                              </DropdownMenuItem>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Genera un análisis completo del cliente con IA</p>
-                              <p className="text-xs text-muted-foreground">Incluye recomendaciones de prioridad</p>
-                            </TooltipContent>
-                          </Tooltip>
                           <DropdownMenuItem
                             onClick={(e: React.MouseEvent) => {
                     e.stopPropagation()
@@ -701,6 +692,16 @@ export function ClientList({
                               <Zap className="h-4 w-4 mr-2" />
                             )}
                             Actualizar estado automáticamente
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    setEditClient(client)
+                  }}
+                            className="cursor-pointer"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar cliente
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
