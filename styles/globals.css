@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Ensure sticky table headers work properly */
+.sticky-table-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
+  background-color: white !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -122,4 +130,11 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+thead th {
+  position: sticky;
+  position: -webkit-sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
 }

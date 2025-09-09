@@ -1,32 +1,64 @@
 import { verifySignatureAppRouter } from "@upstash/qstash/nextjs"
 import { type NextRequest, NextResponse } from "next/server"
+import { ConvexHttpClient } from "convex/browser"
+import { api } from "../../../../convex/_generated/api"
 
-// Mock function - replace with actual Convex call when integrated
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+
 async function markInactiveClients(daysThreshold: number) {
-  // This would normally call the Convex mutation
-  // For now, we'll simulate the process
   console.log(`[CRON] Checking for clients inactive for more than ${daysThreshold} days`)
 
-  // In a real implementation, this would:
-  // 1. Query all clients from Convex
-  // 2. Check their last interaction date
-  // 3. Update status to "Inactivo" for clients exceeding threshold
-  // 4. Return count of updated clients
+  try {
+    // Call the Convex mutation to mark inactive clients
+    const result = await convex.mutation(api.clients.markInactiveClients, {
+      daysThreshold,
+    })
 
-  // Simulated response
-  const updatedCount = Math.floor(Math.random() * 5) // Random for demo
-  console.log(`[CRON] Marked ${updatedCount} clients as inactive`)
-
-  return { updatedClients: updatedCount }
+    console.log(`[CRON] Marked ${result.updatedClients} clients as inactive`)
+    return result
+  } catch (error) {
+    console.error("[CRON] Error marking inactive clients:", error)
+    throw error
+  }
 }
 
 async function handler(request: NextRequest) {
   try {
     console.log("[CRON] Inactive clients check started")
 
-    // Get threshold from query params or use default (7 days for demo, 30 for production)
-    const url = new URL(request.url)
-    const daysThreshold = Number.parseInt(url.searchParams.get("days") || "7")
+    // Get threshold from database configuration
+    let daysThreshold: number
+    try {
+      const configValue = await convex.query(api.clients.getAutomationConfig, {
+        key: "inactive_days_threshold"
+      })
+      daysThreshold = configValue || 30 // fallback to 30 days if not configured
+    } catch (error) {
+      console.warn("[CRON] Could not get automation config, using default 30 days")
+      daysThreshold = 30
+    }
+
+    // Check if automation is enabled
+    let automationEnabled = true
+    try {
+      const enabledValue = await convex.query(api.clients.getAutomationConfig, {
+        key: "automation_enabled"
+      })
+      automationEnabled = enabledValue !== false // default to true if not configured
+    } catch (error) {
+      console.warn("[CRON] Could not check automation status, proceeding")
+    }
+
+    if (!automationEnabled) {
+      console.log("[CRON] Automation is disabled, skipping inactive clients check")
+      return NextResponse.json({
+        success: true,
+        message: "Automation disabled",
+        timestamp: new Date().toISOString(),
+        daysThreshold,
+        automationEnabled: false,
+      })
+    }
 
     // Mark inactive clients
     const result = await markInactiveClients(daysThreshold)
@@ -38,6 +70,7 @@ async function handler(request: NextRequest) {
       message: `Processed ${result.updatedClients} clients`,
       timestamp: new Date().toISOString(),
       daysThreshold,
+      automationEnabled: true,
     })
   } catch (error) {
     console.error("[CRON] Error in inactive clients check:", error)

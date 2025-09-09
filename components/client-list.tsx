@@ -4,7 +4,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { toast } from "sonner"
 import {
   Phone,
   Calendar,
@@ -16,20 +20,89 @@ import {
   Clock,
   MessageSquarePlus,
   Edit,
+  MoreHorizontal,
 } from "lucide-react"
 import type { Client, ClientStatus, ClientPriority } from "./client-dashboard"
 import { AIAnalysisDialog } from "./ai-analysis-dialog"
+import { AIAnalysisModal } from "./ai-analysis-modal"
 import { EditClientDialog } from "./edit-client-dialog"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "../convex/_generated/api"
 import { useRouter } from "next/navigation"
 
 interface ClientListProps {
-  clients: Client[]
+  clients: Client[] // Keep for backward compatibility but won't be used
   onUpdateClient: (id: string, updates: Partial<Client>) => void
+  currentPage?: number
+  itemsPerPage?: number
+  searchTerm?: string
+  statusFilter?: string
+  sortBy?: string
+  sortDirection?: string
+  onTotalCountChange?: (count: number) => void
 }
 
-export function ClientList({ clients, onUpdateClient }: ClientListProps) {
+export function ClientList({ 
+  clients, 
+  onUpdateClient, 
+  currentPage = 1, 
+  itemsPerPage = 20, 
+  searchTerm = "", 
+  statusFilter = "Todos", 
+  sortBy = "ultimaInteraccion", 
+  sortDirection = "desc",
+  onTotalCountChange
+}: ClientListProps) {
   const router = useRouter()
+  const addInteractionMutation = useMutation(api.clients.addInteraction)
+  const updateClientMutation = useMutation(api.clients.updateClient)
+  const addAIAnalysisMutation = useMutation(api.clients.addAIAnalysis)
+  
+  // Use Convex query for real-time updates - this is the source of truth
+  const realTimeClients = useQuery(api.clients.getClients)
+  
+  // Use real-time data when available, fallback to SSR initial data
+  const allClients = realTimeClients || clients
+  
+  // Apply client-side filtering and sorting
+  const filteredAndSortedClients = allClients
+    .filter((client) => {
+      const matchesSearch =
+        client.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        client.telefono.includes(searchTerm)
+      const matchesStatus = statusFilter === "Todos" || client.estado === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      let comparison = 0
+      if (sortBy === "nombre") {
+        comparison = a.nombre.localeCompare(b.nombre)
+      } else if (sortBy === "ultimaInteraccion") {
+        comparison = b.ultimaInteraccion - a.ultimaInteraccion
+      } else if (sortBy === "priority") {
+        const priorityOrder = { Alta: 3, Media: 2, Baja: 1 }
+        comparison = priorityOrder[b.priority] - priorityOrder[a.priority]
+      }
+      return sortDirection === "asc" ? comparison : -comparison
+    })
+  
+  // Apply pagination
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const displayClients = filteredAndSortedClients.slice(startIndex, endIndex)
+  
+  // Notify parent of total count for pagination
+  useEffect(() => {
+    if (onTotalCountChange) {
+      onTotalCountChange(filteredAndSortedClients.length)
+    }
+  }, [filteredAndSortedClients.length, onTotalCountChange])
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [currentPage])
   const [analysisClient, setAnalysisClient] = useState<Client | null>(null)
   const [editClient, setEditClient] = useState<Client | null>(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState<string | null>(null)
@@ -41,6 +114,10 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
   const [interactionTime, setInteractionTime] = useState("")
   const [customType, setCustomType] = useState("")
   const [showCustomType, setShowCustomType] = useState(false)
+  
+  // AI Analysis Modal state
+  const [isAIAnalysisModalOpen, setIsAIAnalysisModalOpen] = useState(false)
+  const [selectedClientForAnalysis, setSelectedClientForAnalysis] = useState<Client | null>(null)
 
   const defaultInteractionTypes = [
     { name: "Llamada", color: "#10b981" },
@@ -91,15 +168,24 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
     }).format(date)
   }
 
-  const getDaysAgo = (date: Date) => {
-    const now = new Date()
-    const diffTime = Math.abs(now.getTime() - date.getTime())
+  const getDaysAgo = (timestamp: number) => {
+    const now = Date.now()
+    const diffTime = Math.abs(now - timestamp)
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
   }
 
-  const handleStatusChange = (clientId: string, newStatus: ClientStatus) => {
+  const handleStatusChange = async (clientId: string, newStatus: ClientStatus) => {
+    try {
+      await updateClientMutation({
+        id: clientId as any,
+        estado: newStatus,
+      })
+      // Also call the parent callback for consistency
     onUpdateClient(clientId, { estado: newStatus })
+    } catch (error) {
+      console.error("Error updating client status:", error)
+    }
   }
 
   const handleAnalyzeClient = async (client: Client) => {
@@ -117,7 +203,7 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
 
       const newRecommendation = {
         id: Date.now().toString(),
-        fecha: new Date(),
+        fecha: Date.now(),
         recommendation: analysis.recommendation || analysis,
         priority: analysis.priority || "Media",
       }
@@ -126,7 +212,7 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
         aiRecommendations: [newRecommendation, ...client.aiRecommendations],
       })
 
-      setAnalysisClient({ ...client, aiAnalysis: analysis })
+      setAnalysisClient(client)
     } catch (error) {
       console.error("Error:", error)
       alert("Error al analizar cliente. Intenta nuevamente.")
@@ -144,20 +230,49 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
         body: JSON.stringify({ client }),
       })
 
-      if (!response.ok) throw new Error("Error en categorización")
+      if (!response.ok) throw new Error("Error en actualización de estado")
 
-      const { category } = await response.json()
-      onUpdateClient(client.id, { estado: category as ClientStatus })
-      alert(`IA ha categorizado al cliente como: ${category}`)
+      const result = await response.json()
+      
+      // Show toast with justification
+      if (result.category && result.justification) {
+        const newStatus = result.category as ClientStatus;
+        const currentStatus = client.estado;
+        
+        if (newStatus !== currentStatus) {
+          // State changed
+          toast.success(`Estado actualizado de ${currentStatus} a ${newStatus}`, {
+            description: result.justification,
+            duration: 5000,
+          });
+          
+          // Update the client state
+          onUpdateClient(client.id, { estado: newStatus });
+        } else {
+          // State unchanged
+          toast.info(`Estado mantenido como ${currentStatus}`, {
+            description: result.justification,
+            duration: 4000,
+          });
+        }
+      } else {
+        // Fallback for old API response
+        const category = result.category || result;
+        onUpdateClient(client.id, { estado: category as ClientStatus });
+        toast.success(`Estado actualizado a: ${category}`);
+      }
     } catch (error) {
-      console.error("Error:", error)
-      alert("Error al categorizar cliente. Intenta nuevamente.")
+      console.error("Error:", error);
+      toast.error("Error al actualizar estado del cliente", {
+        description: "Intenta nuevamente en unos momentos",
+        duration: 4000,
+      });
     } finally {
       setLoadingCategorize(null)
     }
   }
 
-  const handleQuickInteraction = (client: Client) => {
+  const handleQuickInteraction = async (client: Client) => {
     if (!interactionDescription.trim() || (!interactionType && !customType.trim())) return
 
     const selectedDate = interactionDate ? new Date(interactionDate) : new Date()
@@ -169,17 +284,16 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
 
     const finalType = showCustomType && customType.trim() ? customType.trim() : interactionType
 
-    const newInteraction = {
-      id: Date.now().toString(),
-      fecha: selectedDate,
+    try {
+      await addInteractionMutation({
+        clientId: client.id as any, // Convex ID type
       descripcion: interactionDescription.trim(),
       tipo: finalType,
+      })
+    } catch (error) {
+      console.error("Error adding interaction:", error)
+      alert("Error al agregar interacción")
     }
-
-    onUpdateClient(client.id, {
-      interacciones: [newInteraction, ...(client.interacciones || [])],
-      ultimaInteraccion: selectedDate,
-    })
 
     setInteractionDescription("")
     setInteractionType("")
@@ -194,7 +308,37 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
     router.push(`/client/${client.id}`)
   }
 
-  if (clients.length === 0) {
+  const handleOpenAIAnalysis = (client: Client) => {
+    setSelectedClientForAnalysis(client)
+    setIsAIAnalysisModalOpen(true)
+  }
+
+  const handleSaveAIAnalysis = async (clientId: string, analysis: string, priority?: ClientPriority) => {
+    try {
+      await addAIAnalysisMutation({
+        clientId: clientId as any,
+        analysis,
+        priority,
+      })
+    } catch (error) {
+      console.error("Error saving AI analysis:", error)
+      throw error
+    }
+  }
+
+  // Show loading state only if we have no data at all (neither SSR nor Convex)
+  if (realTimeClients === undefined && clients.length === 0) {
+    return (
+      <div className="border rounded-lg p-12 text-center">
+        <div className="text-muted-foreground">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-lg mb-2">Cargando clientes...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (displayClients.length === 0) {
     return (
       <div className="border rounded-lg p-12 text-center">
         <div className="text-muted-foreground">
@@ -206,32 +350,138 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
   }
 
   return (
-    <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {clients.map((client) => {
+    <TooltipProvider>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader 
+            className="border-b shadow-sm"
+            style={{ 
+              position: 'sticky', 
+              top: 0, 
+              zIndex: 50, 
+              backgroundColor: 'white' 
+            }}
+          >
+            <TableRow>
+              <TableHead className="w-[200px] pl-6" style={{ backgroundColor: 'white' }}>Cliente</TableHead>
+              <TableHead className="w-[150px] pl-6" style={{ backgroundColor: 'white' }}>Contacto</TableHead>
+              <TableHead className="w-[120px] pl-6" style={{ backgroundColor: 'white' }}>Estado</TableHead>
+              <TableHead className="w-[100px] pl-6" style={{ backgroundColor: 'white' }}>Prioridad</TableHead>
+              <TableHead className="w-[150px] pl-6" style={{ backgroundColor: 'white' }}>Última Interacción</TableHead>
+              <TableHead className="w-[300px] pl-6" style={{ backgroundColor: 'white' }}>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayClients.map((client) => {
           const daysAgo = getDaysAgo(client.ultimaInteraccion)
-          const latestRecommendation = client.aiRecommendations?.[0]
 
           return (
-            <div
+                <TableRow 
               key={client.id}
-              className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  className="cursor-pointer hover:bg-gray-50"
               onClick={() => handleCardClick(client)}
             >
-              {/* Header Section */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-gray-900 text-lg">{client.nombre}</h3>
+                  {/* Cliente */}
+                  <TableCell className="pl-6">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="font-semibold text-gray-900">{client.nombre}</div>
+                        {client.priority === "Alta" && (
+                          <Badge className="bg-red-500 text-white hover:bg-red-600 text-xs mt-1">
+                            ¡Atención requerida!
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  {/* Contacto */}
+                  <TableCell className="pl-6">
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Phone className="h-4 w-4" />
+                      {client.telefono}
+                    </div>
+                  </TableCell>
+
+                  {/* Estado */}
+                  <TableCell className="pl-6">
+                    <Select
+                      value={client.estado}
+                      onValueChange={(value) => handleStatusChange(client.id, value as ClientStatus)}
+                    >
+                      <SelectTrigger
+                        className="w-[110px] h-8 flex justiy-between"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Badge className={getStatusColor(client.estado)} variant="outline">
+                          {client.estado}
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Activo">
+                          <Badge
+                            className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            Activo
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="Potencial">
+                          <Badge
+                            className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            Potencial
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="Inactivo">
+                          <Badge
+                            className="bg-red-100 text-red-800 border-red-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            Inactivo
+                          </Badge>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+
+                  {/* Prioridad */}
+                  <TableCell className="pl-6">
                   <Badge className={getPriorityColor(client.priority)} variant="outline">
                     {getPriorityIcon(client.priority)}
                     <span className="ml-1">{client.priority}</span>
                   </Badge>
-                  {client.priority === "Alta" && (
-                    <Badge className="bg-red-500 text-white hover:bg-red-600">¡Atención requerida!</Badge>
-                  )}
-                </div>
+                  </TableCell>
 
-                <div className="flex items-center gap-2">
+                  {/* Última Interacción */}
+                  <TableCell className="pl-6">
+                    <div className="flex items-start gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">{formatDate(new Date(client.ultimaInteraccion))}</div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={`text-xs font-medium cursor-help ${
+                                daysAgo > 30 ? "text-red-600" : daysAgo > 7 ? "text-orange-600" : "text-green-600"
+                              }`}
+                            >
+                              {daysAgo === 1 ? "1 día" : `${daysAgo} días`}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Días desde la última interacción con el cliente</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                </div>
+                  </TableCell>
+
+                  {/* Acciones */}
+                  <TableCell className="pl-6">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {/* Quick Interaction Button */}
                   <Dialog
                     open={quickInteractionClient?.id === client.id}
@@ -260,10 +510,10 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
                             `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`,
                           )
                         }}
-                        className="text-green-600 border-green-200 hover:bg-green-50"
+                            className="text-green-600 border-green-200 hover:bg-green-50 h-8 px-2"
                       >
-                        <MessageSquarePlus className="h-4 w-4 mr-1" />
-                        Interacción
+                            <MessageSquarePlus className="h-3 w-3 mr-1" />
+                            <span className="hidden sm:inline">Interacción</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md">
@@ -389,127 +639,78 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
                       e.stopPropagation()
                       setEditClient(client)
                     }}
-                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-
-                  <div className="border-l border-gray-200 pl-2">
-                    <Select
-                      value={client.estado}
-                      onValueChange={(value) => handleStatusChange(client.id, value as ClientStatus)}
-                    >
-                      <SelectTrigger
-                        className="w-[120px] h-8"
-                        onClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        className="text-gray-600 border-gray-200 hover:bg-gray-50 h-8 px-2"
                       >
-                        <Badge className={getStatusColor(client.estado)} variant="outline">
-                          {client.estado}
-                        </Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Activo">
-                          <Badge
-                            className="bg-green-100 text-green-800 border-green-200 text-xs px-2 py-0.5"
-                            variant="outline"
-                          >
-                            Activo
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="Potencial">
-                          <Badge
-                            className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs px-2 py-0.5"
-                            variant="outline"
-                          >
-                            Potencial
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="Inactivo">
-                          <Badge
-                            className="bg-red-100 text-red-800 border-red-200 text-xs px-2 py-0.5"
-                            variant="outline"
-                          >
-                            Inactivo
-                          </Badge>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+                        <Edit className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </Button>
 
-              {/* Contact Info */}
-              <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                <div className="flex items-center gap-1">
-                  <Phone className="h-4 w-4" />
-                  {client.telefono}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span>Última interacción: {formatDate(client.ultimaInteraccion)}</span>
-                  <span
-                    className={`ml-1 font-medium ${
-                      daysAgo > 30 ? "text-red-600" : daysAgo > 7 ? "text-orange-600" : "text-green-600"
-                    }`}
-                  >
-                    ({daysAgo} días)
-                  </span>
-                </div>
-              </div>
-
-              {/* AI Recommendation */}
-              {latestRecommendation && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-3">
-                  <div className="flex items-start gap-2">
-                    <Bot className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-red-800">{latestRecommendation.recommendation}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* AI Actions */}
-              <div className="flex items-center gap-2">
+                      {/* More Actions Dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={(e) => {
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Más acciones</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <DropdownMenuItem
+                                onClick={(e: React.MouseEvent) => {
                     e.stopPropagation()
-                    handleAnalyzeClient(client)
+                        handleOpenAIAnalysis(client)
                   }}
-                  disabled={loadingAnalysis === client.id}
-                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                className="cursor-pointer"
                 >
                   {loadingAnalysis === client.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  ) : (
-                    <Bot className="h-4 w-4 mr-1" />
-                  )}
-                  Analizar Cliente
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Bot className="h-4 w-4 mr-2" />
+                                )}
+                                Analizar automáticamente
+                              </DropdownMenuItem>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Genera un análisis completo del cliente con IA</p>
+                              <p className="text-xs text-muted-foreground">Incluye recomendaciones de prioridad</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <DropdownMenuItem
+                            onClick={(e: React.MouseEvent) => {
                     e.stopPropagation()
                     handleAutoCategorize(client)
                   }}
                   disabled={loadingCategorize === client.id}
-                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                            className="cursor-pointer"
                 >
                   {loadingCategorize === client.id ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  ) : (
-                    <Zap className="h-4 w-4 mr-1" />
-                  )}
-                  Categorizar Auto
-                </Button>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Zap className="h-4 w-4 mr-2" />
+                            )}
+                            Actualizar estado automáticamente
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
               </div>
-            </div>
+                  </TableCell>
+                </TableRow>
           )
         })}
+          </TableBody>
+        </Table>
       </div>
 
       {analysisClient && (
@@ -528,6 +729,19 @@ export function ClientList({ clients, onUpdateClient }: ClientListProps) {
           onUpdateClient={onUpdateClient}
         />
       )}
-    </>
+
+      {selectedClientForAnalysis && (
+        <AIAnalysisModal
+          client={selectedClientForAnalysis}
+          open={isAIAnalysisModalOpen}
+          onOpenChange={(open) => {
+            setIsAIAnalysisModalOpen(open)
+            if (!open) setSelectedClientForAnalysis(null)
+          }}
+          onUpdateClient={onUpdateClient}
+          onSaveAnalysis={handleSaveAIAnalysis}
+        />
+      )}
+    </TooltipProvider>
   )
 }

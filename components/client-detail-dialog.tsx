@@ -38,7 +38,8 @@ export function ClientDetailDialog({ client, open, onOpenChange, onUpdateClient 
     }
   }
 
-  const formatDate = (date: Date) => {
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp)
     return new Intl.DateTimeFormat("es-AR", {
       day: "2-digit",
       month: "2-digit",
@@ -48,7 +49,8 @@ export function ClientDetailDialog({ client, open, onOpenChange, onUpdateClient 
     }).format(date)
   }
 
-  const formatDateShort = (date: Date) => {
+  const formatDateShort = (timestamp: number) => {
+    const date = new Date(timestamp)
     return new Intl.DateTimeFormat("es-AR", {
       day: "2-digit",
       month: "2-digit",
@@ -58,7 +60,7 @@ export function ClientDetailDialog({ client, open, onOpenChange, onUpdateClient 
 
   const latestRecommendation =
     client.aiRecommendations && client.aiRecommendations.length > 0
-      ? client.aiRecommendations.sort((a, b) => b.fecha.getTime() - a.fecha.getTime())[0]
+      ? client.aiRecommendations.sort((a, b) => b.fecha - a.fecha)[0]
       : null
 
   return (
@@ -108,7 +110,7 @@ export function ClientDetailDialog({ client, open, onOpenChange, onUpdateClient 
               <ScrollArea className="h-[300px] w-full">
                 <div className="space-y-3 pr-4">
                   {(client.interacciones || [])
-                    .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
+                    .sort((a, b) => b.fecha - a.fecha)
                     .map((interaction, index) => (
                       <Card key={interaction.id} className="border-l-4 border-l-blue-500">
                         <CardContent className="py-3">

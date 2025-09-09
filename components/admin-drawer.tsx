@@ -2,7 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "../convex/_generated/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -18,32 +20,35 @@ interface AdminDrawerProps {
 }
 
 export function AdminDrawer({ children }: AdminDrawerProps) {
-  const [selectedSchedule, setSelectedSchedule] = useState("daily")
-  const [customDays, setCustomDays] = useState("7")
-  const [customHour, setCustomHour] = useState("9")
-  const [customMinute, setCustomMinute] = useState("0")
+  const [checkFrequency, setCheckFrequency] = useState("24h")
+  const [customDays, setCustomDays] = useState("30")
   const [isSettingUp, setIsSettingUp] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [lastResult, setLastResult] = useState<any>(null)
+  const [isUpdatingConfig, setIsUpdatingConfig] = useState(false)
 
-  const scheduleOptions = [
-    { value: "daily", label: "Una vez al día", cron: `0 ${customHour} * * *` },
-    {
-      value: "twice-daily",
-      label: "Dos veces al día",
-      cron: `0 ${customHour},${Number.parseInt(customHour) + 9} * * *`,
-    },
-    { value: "weekly", label: "Una vez por semana", cron: `0 ${customHour} * * 1` },
-    { value: "every-6h", label: "Cada 6 horas", cron: "0 */6 * * *" },
-    { value: "every-12h", label: "Cada 12 horas", cron: "0 */12 * * *" },
-    { value: "custom", label: "Personalizado", cron: `${customMinute} ${customHour} * * *` },
+  // Load automation configuration from database
+  const automationConfigs = useQuery(api.clients.getAllAutomationConfigs)
+  const setAutomationConfig = useMutation(api.clients.setAutomationConfig)
+
+  // Update local state when config loads
+  useEffect(() => {
+    if (automationConfigs) {
+      setCustomDays(String(automationConfigs.inactive_days_threshold || 30))
+      setCheckFrequency(automationConfigs.check_frequency || "24h")
+    }
+  }, [automationConfigs])
+
+  const frequencyOptions = [
+    { value: "1m", label: "Cada 1 minuto", cron: "* * * * *" },
+    { value: "5m", label: "Cada 5 minutos", cron: "*/5 * * * *" },
+    { value: "10m", label: "Cada 10 minutos", cron: "*/10 * * * *" },
+    { value: "1h", label: "Cada 1 hora", cron: "0 * * * *" },
+    { value: "24h", label: "Cada 24 horas", cron: "0 9 * * *" },
   ]
 
   const getCurrentCron = () => {
-    const option = scheduleOptions.find((opt) => opt.value === selectedSchedule)
-    if (selectedSchedule === "custom") {
-      return `${customMinute} ${customHour} * * *`
-    }
+    const option = frequencyOptions.find(opt => opt.value === checkFrequency)
     return option?.cron || "0 9 * * *"
   }
 
@@ -78,7 +83,7 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
   const runManualCheck = async () => {
     setIsRunning(true)
     try {
-      const response = await fetch(`/api/cron/check-inactive-clients?days=${customDays}`)
+      const response = await fetch(`/api/cron/check-inactive-clients`)
       const result = await response.json()
 
       if (result.success) {
@@ -95,24 +100,45 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
     }
   }
 
+  const updateAutomationConfig = async () => {
+    setIsUpdatingConfig(true)
+    try {
+      await setAutomationConfig({
+        key: "inactive_days_threshold",
+        value: Number(customDays),
+        description: "Number of days after which a client is considered inactive",
+      })
+
+      await setAutomationConfig({
+        key: "check_frequency",
+        value: checkFrequency,
+        description: "How often to check for inactive clients",
+      })
+
+      alert("Configuración actualizada exitosamente!")
+    } catch (error) {
+      alert("Error al actualizar la configuración")
+      console.error(error)
+    } finally {
+      setIsUpdatingConfig(false)
+    }
+  }
+
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-        <SheetHeader>
+      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto border-none">
+        <SheetHeader className="pb-0">
           <SheetTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Administración CRM
+            Configuración de Automatización
           </SheetTitle>
           <SheetDescription className="mb-2">Configuración y automatización del sistema</SheetDescription>
         </SheetHeader>
 
         <div className="space-y-2">
-          <Card className="pt-0">
-            <CardHeader>
-              <CardTitle className="text-lg">Configuración de Automatización</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <Card className="pt-0 border-none">
+            <CardContent className="space-y-4 pt-0">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Días para considerar cliente inactivo</Label>
@@ -127,67 +153,49 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
                   <p className="text-xs text-muted-foreground">
                     Clientes sin interacciones por más de {customDays} días serán marcados como inactivos
                   </p>
+                  <Button 
+                    onClick={updateAutomationConfig} 
+                    disabled={isUpdatingConfig}
+                    size="sm"
+                    className="w-full"
+                  >
+                    {isUpdatingConfig ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Guardar Configuración
+                      </>
+                    )}
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Frecuencia de revisión</Label>
-                  <Select value={selectedSchedule} onValueChange={setSelectedSchedule}>
+                  <Select value={checkFrequency} onValueChange={setCheckFrequency}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona la frecuencia" />
                     </SelectTrigger>
                     <SelectContent>
-                      {scheduleOptions.map((option) => (
+                      {frequencyOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                {(selectedSchedule === "custom" || selectedSchedule === "daily" || selectedSchedule === "weekly") && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-2">
-                      <Label>Hora</Label>
-                      <Select value={customHour} onValueChange={setCustomHour}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 24 }, (_, i) => (
-                            <SelectItem key={i} value={i.toString()}>
-                              {i.toString().padStart(2, "0")}:00
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {selectedSchedule === "custom" && (
-                      <div className="space-y-2">
-                        <Label>Minuto</Label>
-                        <Select value={customMinute} onValueChange={setCustomMinute}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[0, 15, 30, 45].map((minute) => (
-                              <SelectItem key={minute} value={minute.toString()}>
-                                :{minute.toString().padStart(2, "0")}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                  <div className="p-2 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600">
+                    Expresión cron: {getCurrentCron()}
                   </div>
-                )}
+                </div>
 
                 <div className="p-3 bg-muted rounded-lg">
                   <p className="text-sm font-medium">Configuración actual:</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Revisar cada {scheduleOptions.find((opt) => opt.value === selectedSchedule)?.label.toLowerCase()}
-                    {(selectedSchedule === "custom" || selectedSchedule === "daily" || selectedSchedule === "weekly") &&
-                      ` a las ${customHour.padStart(2, "0")}:${customMinute.padStart(2, "0")}`}
+                    Revisar cada {frequencyOptions.find((opt) => opt.value === checkFrequency)?.label.toLowerCase()}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Marcar como inactivos después de {customDays} días sin interacción

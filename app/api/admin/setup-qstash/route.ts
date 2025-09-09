@@ -1,5 +1,7 @@
 import { Client } from "@upstash/qstash"
 import { type NextRequest, NextResponse } from "next/server"
+import { ConvexHttpClient } from "convex/browser"
+import { api } from "../../../../convex/_generated/api"
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,22 +10,35 @@ export async function POST(request: NextRequest) {
       token: process.env.QSTASH_TOKEN!,
     })
 
+    // Initialize Convex client to get automation config
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+    const automationConfigs = await convex.query(api.clients.getAllAutomationConfigs)
+
     const { schedule = "0 9 * * *" } = await request.json() // Default: daily at 9 AM
+    const daysThreshold = automationConfigs?.inactive_days_threshold || 30
 
     // Get the base URL for the webhook
+    const host = request.headers.get("host")
+    const protocol = request.headers.get("x-forwarded-proto") || "http"
+    
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXTAUTH_URL || "http://localhost:3000"
+      : host
+      ? `${protocol}://${host}`
+      : "http://192.168.0.188:3000"
 
-    const webhookUrl = `${baseUrl}/api/cron/check-inactive-clients?days=7`
+    console.log("baseUrl", baseUrl)
 
+    const webhookUrl = `${baseUrl}/api/cron/check-inactive-clients?days=${daysThreshold}`
+    console.log("webhookUrl", webhookUrl)
+    console.log("daysThreshold", daysThreshold)
     // Create or update the scheduled job
     const scheduleResponse = await qstash.schedules.create({
       destination: webhookUrl,
       cron: schedule, // Cron expression for scheduling
       body: JSON.stringify({
         action: "check_inactive_clients",
-        daysThreshold: 7,
+        daysThreshold: daysThreshold,
       }),
       headers: {
         "Content-Type": "application/json",

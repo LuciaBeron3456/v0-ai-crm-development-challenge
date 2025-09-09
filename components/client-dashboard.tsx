@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "../convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Filter, Users, UserCheck, UserX, Clock, ArrowUp, ArrowDown, Settings } from "lucide-react"
 import { ClientList } from "./client-list"
+import { ClientListSkeleton } from "./client-list-skeleton"
 import { AddClientDialog } from "./add-client-dialog"
+import { Pagination } from "./pagination"
 import { Badge } from "@/components/ui/badge"
 
 export type ClientStatus = "Activo" | "Inactivo" | "Potencial"
@@ -15,9 +19,16 @@ export type ClientPriority = "Alta" | "Media" | "Baja"
 
 export interface AIRecommendation {
   id: string
-  fecha: Date
+  fecha: number // timestamp
   recommendation: string
   priority: string
+}
+
+export interface AIAnalysis {
+  id: string
+  fecha: number // timestamp
+  analysis: string
+  priority?: string // priority at time of analysis
 }
 
 export interface Client {
@@ -25,84 +36,83 @@ export interface Client {
   nombre: string
   telefono: string
   estado: ClientStatus
-  ultimaInteraccion: Date
+  ultimaInteraccion: number // timestamp
   interacciones: Interaction[]
   priority: ClientPriority
   aiRecommendations: AIRecommendation[]
+  aiAnalyses: AIAnalysis[]
 }
 
 export interface Interaction {
   id: string
-  fecha: Date
+  fecha: number // timestamp
   descripcion: string
+  tipo?: string
 }
 
-const mockClients: Client[] = [
-  {
-    id: "1",
-    nombre: "Juan Pérez",
-    telefono: "+54 11 1234-5678",
-    estado: "Activo",
-    ultimaInteraccion: new Date("2024-12-01"),
-    priority: "Alta",
-    aiRecommendations: [
-      {
-        id: "1",
-        fecha: new Date("2024-12-01"),
-        recommendation: "Cliente muy activo. Mantener comunicación regular y ofrecer nuevos servicios.",
-        priority: "Alta",
-      },
-    ],
-    interacciones: [
-      { id: "1", fecha: new Date("2024-12-01"), descripcion: "Llamada de seguimiento" },
-      { id: "2", fecha: new Date("2024-11-15"), descripcion: "Reunión inicial" },
-    ],
-  },
-  {
-    id: "2",
-    nombre: "María García",
-    telefono: "+54 11 9876-5432",
-    estado: "Potencial",
-    ultimaInteraccion: new Date("2024-11-28"),
-    priority: "Media",
-    aiRecommendations: [
-      {
-        id: "2",
-        fecha: new Date("2024-11-28"),
-        recommendation: "Cliente potencial con buen perfil. Programar seguimiento en 1 semana.",
-        priority: "Media",
-      },
-    ],
-    interacciones: [{ id: "3", fecha: new Date("2024-11-28"), descripcion: "Primer contacto" }],
-  },
-  {
-    id: "3",
-    nombre: "Carlos López",
-    telefono: "+54 11 5555-1234",
-    estado: "Inactivo",
-    ultimaInteraccion: new Date("2024-10-15"),
-    priority: "Baja",
-    aiRecommendations: [
-      {
-        id: "3",
-        fecha: new Date("2024-10-15"),
-        recommendation: "Cliente inactivo por más de 30 días. Considerar campaña de reactivación.",
-        priority: "Baja",
-      },
-    ],
-    interacciones: [{ id: "4", fecha: new Date("2024-10-15"), descripcion: "Última comunicación" }],
-  },
-]
+interface ClientDashboardProps {
+  initialClients?: Client[]
+  initialTotalCount?: number
+  initialAllClients?: Client[]
+}
 
-export function ClientDashboard() {
-  const [clients, setClients] = useState<Client[]>(mockClients)
+export function ClientDashboard({ initialClients = [], initialTotalCount = 0, initialAllClients = [] }: ClientDashboardProps) {
+  const [clients, setClients] = useState<Client[]>(initialClients)
+  const [allClients, setAllClients] = useState<Client[]>(initialAllClients)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasNextPage, setHasNextPage] = useState(true)
+  const [totalCount, setTotalCount] = useState(initialTotalCount)
+  const [filteredTotalCount, setFilteredTotalCount] = useState(0)
+  
+  // Local state for filters and search
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<ClientStatus | "Todos">("Todos")
   const [sortBy, setSortBy] = useState<"nombre" | "ultimaInteraccion" | "priority">("ultimaInteraccion")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
+  const [itemsPerPage, setItemsPerPage] = useState(20)
+  
+  const addClientMutation = useMutation(api.clients.addClient)
+  const updateClientMutation = useMutation(api.clients.updateClient)
+  const addInteractionMutation = useMutation(api.clients.addInteraction)
+  
+  // Use Convex query for real-time updates - this is the source of truth
+  const realTimeClients = useQuery(api.clients.getClients)
+  const totalCountQuery = useQuery(api.clients.getClientsCount)
+  
+  // Update total count when Convex query returns (for real-time updates)
+  useEffect(() => {
+    if (totalCountQuery !== undefined) {
+      setTotalCount(totalCountQuery)
+    }
+  }, [totalCountQuery])
+  
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 
-  const filteredClients = clients
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
+
+  // Load all clients once on mount
+  useEffect(() => {
+    if (initialClients.length > 0) {
+      setClients(initialClients)
+    }
+  }, [initialClients])
+
+  // Reset to page 1 when items per page or filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [itemsPerPage, searchTerm, statusFilter, sortBy, sortDirection])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Use real-time data when available, fallback to SSR initial data
+  const currentAllClients = realTimeClients || allClients
+  const currentClients = realTimeClients || clients
+
+  // Filter and sort all clients (for stats and fallback)
+  const allFilteredClients = (currentAllClients || [])
     .filter((client) => {
       const matchesSearch =
         client.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || client.telefono.includes(searchTerm)
@@ -115,7 +125,7 @@ export function ClientDashboard() {
       if (sortBy === "nombre") {
         comparison = a.nombre.localeCompare(b.nombre)
       } else if (sortBy === "ultimaInteraccion") {
-        comparison = b.ultimaInteraccion.getTime() - a.ultimaInteraccion.getTime()
+        comparison = b.ultimaInteraccion - a.ultimaInteraccion
       } else if (sortBy === "priority") {
         const priorityOrder = { Alta: 3, Media: 2, Baja: 1 }
         comparison = priorityOrder[b.priority] - priorityOrder[a.priority]
@@ -124,27 +134,27 @@ export function ClientDashboard() {
       return sortDirection === "asc" ? comparison : -comparison
     })
 
+  // Use the filtered count from ClientList for pagination
+  const filteredTotalPages = Math.ceil(filteredTotalCount / itemsPerPage)
+
   const stats = {
-    total: clients.length,
-    activos: clients.filter((c) => c.estado === "Activo").length,
-    potenciales: clients.filter((c) => c.estado === "Potencial").length,
-    inactivos: clients.filter((c) => c.estado === "Inactivo").length,
+    total: (currentAllClients || []).length,
+    activos: (currentAllClients || []).filter((c) => c.estado === "Activo").length,
+    potenciales: (currentAllClients || []).filter((c) => c.estado === "Potencial").length,
+    inactivos: (currentAllClients || []).filter((c) => c.estado === "Inactivo").length,
   }
 
-  const addClient = (newClient: Omit<Client, "id" | "interacciones" | "priority" | "aiRecommendations">) => {
-    const daysSinceInteraction = Math.ceil(
-      (new Date().getTime() - newClient.ultimaInteraccion.getTime()) / (1000 * 60 * 60 * 24),
-    )
-    const priority: ClientPriority = daysSinceInteraction > 30 ? "Baja" : daysSinceInteraction > 7 ? "Media" : "Alta"
-
-    const client: Client = {
-      ...newClient,
-      id: Date.now().toString(),
-      interacciones: [],
-      priority,
-      aiRecommendations: [],
+  const addClient = async (newClient: Omit<Client, "id" | "interacciones" | "priority" | "aiRecommendations">) => {
+    try {
+      await addClientMutation({
+        nombre: newClient.nombre,
+        telefono: newClient.telefono,
+        estado: newClient.estado,
+      })
+    } catch (error) {
+      console.error("Error adding client:", error)
+      alert("Error al agregar cliente")
     }
-    setClients((prev) => [...prev, client])
   }
 
   const handleSortChange = (newSortBy: "nombre" | "ultimaInteraccion" | "priority") => {
@@ -156,19 +166,30 @@ export function ClientDashboard() {
     }
   }
 
-  const updateClientPriority = (clientId: string) => {
-    setClients((prev) =>
-      prev.map((client) => {
-        if (client.id === clientId) {
-          const daysSinceInteraction = Math.ceil(
-            (new Date().getTime() - client.ultimaInteraccion.getTime()) / (1000 * 60 * 60 * 24),
-          )
-          const newPriority: ClientPriority =
-            daysSinceInteraction > 30 ? "Baja" : daysSinceInteraction > 7 ? "Media" : "Alta"
-          return { ...client, priority: newPriority }
-        }
-        return client
-      }),
+  const updateClient = async (id: string, updates: Partial<Client>) => {
+    try {
+      await updateClientMutation({
+        id: id as any, // Convex ID type
+        ...updates,
+        ultimaInteraccion: updates.ultimaInteraccion,
+      })
+    } catch (error) {
+      console.error("Error updating client:", error)
+      alert("Error al actualizar cliente")
+    }
+  }
+
+  // Show loading state only if we're loading more pages and have no clients
+  if (isLoading && (!currentClients || currentClients.length === 0)) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando clientes...</p>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -227,7 +248,7 @@ export function ClientDashboard() {
             />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ClientStatus | "Todos")}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[210px]">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
             </SelectTrigger>
@@ -267,7 +288,17 @@ export function ClientDashboard() {
               onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
               className="px-3"
             >
-              {sortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+              {sortDirection === "asc" ? (
+                <>
+                  <ArrowUp className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Ascendente</span>
+                </>
+              ) : (
+                <>
+                  <ArrowDown className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Descendente</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -279,15 +310,31 @@ export function ClientDashboard() {
         </div>
       </div>
 
+
       {/* Client List */}
       <ClientList
-        clients={filteredClients}
-        onUpdateClient={(id, updates) => {
-          setClients((prev) => prev.map((client) => (client.id === id ? { ...client, ...updates } : client)))
-          if (updates.ultimaInteraccion) {
-            updateClientPriority(id)
-          }
-        }}
+        clients={currentClients} // Pass real-time data as primary source
+        onUpdateClient={updateClient}
+        currentPage={currentPage}
+        itemsPerPage={itemsPerPage}
+        searchTerm={searchTerm}
+        statusFilter={statusFilter}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onTotalCountChange={setFilteredTotalCount}
+      />
+
+      {/* Pagination */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={Math.max(filteredTotalPages, 1)}
+        onPageChange={handlePageChange}
+        isLoading={false}
+        hasNextPage={currentPage < filteredTotalPages}
+        hasPrevPage={currentPage > 1}
+        totalItems={filteredTotalCount}
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={setItemsPerPage}
       />
 
       {/* Add Client Dialog */}

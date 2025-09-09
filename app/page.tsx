@@ -2,9 +2,18 @@ import { ClientDashboard } from "@/components/client-dashboard"
 import { AdminDrawer } from "@/components/admin-drawer"
 import { Button } from "@/components/ui/button"
 import { Settings } from "lucide-react"
-export default function HomePage() {
+import { getInitialClients, getTotalClientsCount, getAllClientsForStats } from "@/components/clients-server"
+
+export default async function HomePage() {
+  // SSR: Load initial clients, total count, and all clients for stats on the server
+  const [initialClients, totalCount, allClientsForStats] = await Promise.all([
+    getInitialClients(20),
+    getTotalClientsCount(),
+    getAllClientsForStats()
+  ])
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background md:mx-8">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
@@ -19,8 +28,12 @@ export default function HomePage() {
           </AdminDrawer>
         </div>
       </header>
-      <main className="container mx-auto px-4 py-6">
-        <ClientDashboard />
+      <main className="container mx-auto px-4 py-6 pb-20">
+        <ClientDashboard 
+          initialClients={initialClients as any} 
+          initialTotalCount={totalCount}
+          initialAllClients={allClientsForStats as any}
+        />
       </main>
     </div>
   )
