@@ -152,6 +152,10 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
         telefono: newClient.telefono,
         estado: newClient.estado,
       })
+      toast.success("Cliente creado", {
+        description: `${newClient.nombre} ha sido agregado exitosamente`,
+        duration: 3000,
+      })
     } catch (error) {
       console.error("Error adding client:", error)
       toast.error("Error al agregar cliente")
