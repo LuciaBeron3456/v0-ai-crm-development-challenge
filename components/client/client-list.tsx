@@ -715,6 +715,7 @@ export function ClientList({
         <ClientFormDialog
           client={editClient}
           open={!!editClient}
+          onSave={() => {}}
           onOpenChange={(open) => !open && setEditClient(null)}
           onUpdate={onUpdateClient}
         />
