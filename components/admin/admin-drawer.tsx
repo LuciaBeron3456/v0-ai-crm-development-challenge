@@ -88,7 +88,7 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
       const result = await response.json()
 
       if (result.success) {
-        toast.success(`Verificación completada: ${result.message}`)
+        toast.success(`Verificación completada.`)
         setLastResult(result)
       } else {
         toast.error(`Error: ${result.error}`)
@@ -244,38 +244,6 @@ export function AdminDrawer({ children }: AdminDrawerProps) {
                   )}
                 </Button>
               </div>
-
-              {lastResult && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      {lastResult.success ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                      )}
-                      Último Resultado
-                    </h3>
-                    <Card className={lastResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
-                      <CardContent className="pt-4">
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Estado:</span>
-                            <Badge variant={lastResult.success ? "default" : "destructive"}>
-                              {lastResult.success ? "Exitoso" : "Error"}
-                            </Badge>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Resultado:</span>
-                            <span className="font-medium">{lastResult.message || lastResult.error}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </>
-              )}
             </CardContent>
           </Card>
 
