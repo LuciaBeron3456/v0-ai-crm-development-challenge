@@ -24,7 +24,6 @@ import {
   Brain,
 } from "lucide-react"
 import type { Client, ClientStatus, ClientPriority, ClientListProps } from "@/lib/types"
-import { AIAnalysisDialog } from "../ai/ai-analysis-dialog"
 import { AIAnalysisModal } from "../ai/ai-analysis-modal"
 import { ClientFormDialog } from "./client-form-dialog"
 import { useState, useEffect } from "react"
@@ -702,14 +701,6 @@ export function ClientList({
           </TableBody>
         </Table>
       </div>
-
-      {analysisClient && (
-        <AIAnalysisDialog
-          client={analysisClient}
-          open={!!analysisClient}
-          onOpenChange={(open) => !open && setAnalysisClient(null)}
-        />
-      )}
 
       {editClient && (
         <ClientFormDialog
