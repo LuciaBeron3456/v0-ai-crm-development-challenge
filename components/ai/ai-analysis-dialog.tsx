@@ -4,13 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Bot, Brain, TrendingUp, AlertCircle } from "lucide-react"
-import type { Client } from "./client-dashboard"
-
-interface AIAnalysisDialogProps {
-  client: Client & { aiAnalysis?: string }
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+import type { Client, AIAnalysisDialogProps } from "@/lib/types"
 
 export function AIAnalysisDialog({ client, open, onOpenChange }: AIAnalysisDialogProps) {
   const getStatusColor = (status: string) => {

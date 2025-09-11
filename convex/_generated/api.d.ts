@@ -14,7 +14,6 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as clients from "../clients.js";
-import type * as seed from "../seed.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -26,7 +25,6 @@ import type * as seed from "../seed.js";
  */
 declare const fullApi: ApiFromModules<{
   clients: typeof clients;
-  seed: typeof seed;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

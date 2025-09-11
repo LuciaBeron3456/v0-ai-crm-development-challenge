@@ -7,15 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Brain, Loader2, Save, AlertTriangle, TrendingUp, Clock } from "lucide-react"
 import { toast } from "sonner"
-import type { Client, ClientPriority } from "./client-dashboard"
-
-interface AIAnalysisModalProps {
-  client: Client
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onUpdateClient: (id: string, updates: Partial<Client>) => void
-  onSaveAnalysis: (clientId: string, analysis: string, priority?: ClientPriority) => void
-}
+import type { Client, ClientPriority, AIAnalysisModalProps } from "@/lib/types"
 
 export function AIAnalysisModal({ 
   client, 

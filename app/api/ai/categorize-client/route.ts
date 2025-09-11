@@ -50,8 +50,7 @@ La justificación debe explicar:
 
     const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      prompt,
-      maxTokens: 200,
+      prompt
     })
 
     try {

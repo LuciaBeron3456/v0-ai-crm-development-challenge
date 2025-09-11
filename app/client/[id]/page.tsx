@@ -2,15 +2,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft, Phone, Calendar, Bot, AlertTriangle, TrendingUp, Clock } from "lucide-react"
-import { getClientById } from "@/components/client-detail-server"
-import type { Client, ClientPriority } from "@/components/client-dashboard"
+import { getClientById } from "@/lib/data/clients"
+import type { Client, ClientPriority, ClientDetailPageProps } from "@/lib/types"
 import { ClientDetailClient } from "./client-detail-client"
 
-interface ClientDetailPageProps {
-  params: {
-    id: string
-  }
-}
 
 export default async function ClientDetailPage({ params }: ClientDetailPageProps) {
   const client = await getClientById(params.id)

@@ -1,7 +1,12 @@
 import { ConvexHttpClient } from "convex/browser"
-import { api } from "../convex/_generated/api"
+import { api } from "../../convex/_generated/api"
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
+
+/**
+ * Server-side data fetching functions for client-related operations
+ * Used for SSR (Server-Side Rendering) in Next.js pages
+ */
 
 export async function getInitialClients(limit: number = 20) {
   try {
@@ -32,3 +37,14 @@ export async function getAllClientsForStats() {
     return []
   }
 }
+
+export async function getClientById(clientId: string) {
+  try {
+    const clients = await convex.query(api.clients.getClients)
+    return clients.find(client => client.id === clientId) || null
+  } catch (error) {
+    console.error("Error fetching client by ID:", error)
+    return null
+  }
+}
+

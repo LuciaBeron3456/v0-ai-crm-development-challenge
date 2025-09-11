@@ -13,11 +13,8 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
-import type { Client, ClientPriority, ClientStatus } from "@/components/client-dashboard";
+import type { Client, ClientPriority, ClientStatus, ClientDetailClientProps } from "@/lib/types";
 
-interface ClientDetailClientProps {
-  client: Client | null
-}
 
 export function ClientDetailClient({ client }: ClientDetailClientProps) {
   const router = useRouter();

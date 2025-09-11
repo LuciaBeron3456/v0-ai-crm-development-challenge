@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useQuery, useMutation } from "convex/react"
-import { api } from "../convex/_generated/api"
+import { api } from "../../convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,51 +11,15 @@ import { Plus, Search, Filter, Users, UserCheck, UserX, Clock, ArrowUp, ArrowDow
 import { toast } from "sonner"
 import { ClientList } from "./client-list"
 import { ClientListSkeleton } from "./client-list-skeleton"
-import { AddClientDialog } from "./add-client-dialog"
-import { Pagination } from "./pagination"
+import { ClientFormDialog } from "./client-form-dialog"
+import { Pagination } from "../common/pagination"
 import { Badge } from "@/components/ui/badge"
-
-export type ClientStatus = "Activo" | "Inactivo" | "Potencial"
-export type ClientPriority = "Alta" | "Media" | "Baja"
-
-export interface AIRecommendation {
-  id: string
-  fecha: number // timestamp
-  recommendation: string
-  priority: string
-}
-
-export interface AIAnalysis {
-  id: string
-  fecha: number // timestamp
-  analysis: string
-  priority?: string // priority at time of analysis
-}
-
-export interface Client {
-  id: string
-  nombre: string
-  telefono: string
-  estado: ClientStatus
-  ultimaInteraccion: number // timestamp
-  interacciones: Interaction[]
-  priority: ClientPriority
-  aiRecommendations: AIRecommendation[]
-  aiAnalyses: AIAnalysis[]
-}
-
-export interface Interaction {
-  id: string
-  fecha: number // timestamp
-  descripcion: string
-  tipo?: string
-}
-
-interface ClientDashboardProps {
-  initialClients?: Client[]
-  initialTotalCount?: number
-  initialAllClients?: Client[]
-}
+import type { 
+  Client, 
+  ClientStatus, 
+  ClientPriority, 
+  ClientDashboardProps 
+} from "@/lib/types"
 
 export function ClientDashboard({ initialClients = [], initialTotalCount = 0, initialAllClients = [] }: ClientDashboardProps) {
   const [clients, setClients] = useState<Client[]>(initialClients)
@@ -109,8 +73,9 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
   }
 
   // Use real-time data when available, fallback to SSR initial data
-  const currentAllClients = realTimeClients || allClients
-  const currentClients = realTimeClients || clients
+  // Only switch to real-time data once it's loaded to avoid reordering
+  const currentAllClients = realTimeClients !== undefined ? realTimeClients : allClients
+  const currentClients = realTimeClients !== undefined ? realTimeClients : clients
 
   // Filter and sort all clients (for stats and fallback)
   const allFilteredClients = (currentAllClients || [])
@@ -145,7 +110,7 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
     inactivos: (currentAllClients || []).filter((c) => c.estado === "Inactivo").length,
   }
 
-  const addClient = async (newClient: Omit<Client, "id" | "interacciones" | "priority" | "aiRecommendations">) => {
+  const addClient = async (newClient: Omit<Client, "id" | "interacciones" | "aiRecommendations" | "aiAnalyses">) => {
     try {
       await addClientMutation({
         nombre: newClient.nombre,
@@ -342,8 +307,12 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
         onItemsPerPageChange={setItemsPerPage}
       />
 
-      {/* Add Client Dialog */}
-      <AddClientDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} onAddClient={addClient} />
+      {/* Client Form Dialog */}
+      <ClientFormDialog 
+        open={isAddDialogOpen} 
+        onOpenChange={setIsAddDialogOpen} 
+        onSave={addClient}
+      />
     </div>
   )
 }

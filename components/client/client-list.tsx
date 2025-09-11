@@ -23,26 +23,15 @@ import {
   MoreHorizontal,
   Brain,
 } from "lucide-react"
-import type { Client, ClientStatus, ClientPriority } from "./client-dashboard"
-import { AIAnalysisDialog } from "./ai-analysis-dialog"
-import { AIAnalysisModal } from "./ai-analysis-modal"
-import { EditClientDialog } from "./edit-client-dialog"
+import type { Client, ClientStatus, ClientPriority, ClientListProps } from "@/lib/types"
+import { AIAnalysisDialog } from "../ai/ai-analysis-dialog"
+import { AIAnalysisModal } from "../ai/ai-analysis-modal"
+import { ClientFormDialog } from "./client-form-dialog"
 import { useState, useEffect } from "react"
 import { useQuery, useMutation } from "convex/react"
-import { api } from "../convex/_generated/api"
+import { api } from "../../convex/_generated/api"
 import { useRouter } from "next/navigation"
 
-interface ClientListProps {
-  clients: Client[] // Keep for backward compatibility but won't be used
-  onUpdateClient: (id: string, updates: Partial<Client>) => void
-  currentPage?: number
-  itemsPerPage?: number
-  searchTerm?: string
-  statusFilter?: string
-  sortBy?: string
-  sortDirection?: string
-  onTotalCountChange?: (count: number) => void
-}
 
 export function ClientList({ 
   clients, 
@@ -723,11 +712,11 @@ export function ClientList({
       )}
 
       {editClient && (
-        <EditClientDialog
+        <ClientFormDialog
           client={editClient}
           open={!!editClient}
           onOpenChange={(open) => !open && setEditClient(null)}
-          onUpdateClient={onUpdateClient}
+          onUpdate={onUpdateClient}
         />
       )}
 

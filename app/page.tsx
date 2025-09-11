@@ -1,8 +1,8 @@
-import { ClientDashboard } from "@/components/client-dashboard"
-import { AdminDrawer } from "@/components/admin-drawer"
+import { ClientDashboard } from "@/components/client/client-dashboard"
+import { AdminDrawer } from "@/components/admin/admin-drawer"
 import { Button } from "@/components/ui/button"
 import { Settings } from "lucide-react"
-import { getInitialClients, getTotalClientsCount, getAllClientsForStats } from "@/components/clients-server"
+import { getInitialClients, getTotalClientsCount, getAllClientsForStats } from "@/lib/data/clients"
 
 export default async function HomePage() {
   // SSR: Load initial clients, total count, and all clients for stats on the server
