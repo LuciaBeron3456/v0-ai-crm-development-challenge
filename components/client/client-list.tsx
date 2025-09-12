@@ -177,6 +177,19 @@ export function ClientList({
     }
   }
 
+  const handlePriorityChange = async (clientId: string, newPriority: ClientPriority) => {
+    try {
+      await updateClientMutation({
+        id: clientId as any,
+        priority: newPriority,
+      })
+      // Also call the parent callback for consistency
+      onUpdateClient(clientId, { priority: newPriority })
+    } catch (error) {
+      console.error("Error updating client priority:", error)
+    }
+  }
+
   const handleAnalyzeClient = async (client: Client) => {
     setLoadingAnalysis(client.id)
     try {
@@ -442,10 +455,50 @@ export function ClientList({
 
                   {/* Prioridad */}
                   <TableCell className="pl-6">
-                  <Badge className={getPriorityColor(client.priority)} variant="outline">
-                    {getPriorityIcon(client.priority)}
-                    <span className="ml-1">{client.priority}</span>
-                  </Badge>
+                    <Select
+                      value={client.priority}
+                      onValueChange={(value) => handlePriorityChange(client.id, value as ClientPriority)}
+                    >
+                      <SelectTrigger
+                        className="w-[110px] h-8 flex justify-between"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Badge className={getPriorityColor(client.priority)} variant="outline">
+                          {getPriorityIcon(client.priority)}
+                          <span className="ml-1">{client.priority}</span>
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Alta">
+                          <Badge
+                            className="bg-red-100 text-red-800 border-red-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Alta
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="Media">
+                          <Badge
+                            className="bg-yellow-100 text-yellow-800 border-yellow-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            Media
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="Baja">
+                          <Badge
+                            className="bg-gray-100 text-gray-800 border-gray-200 text-xs px-2 py-0.5"
+                            variant="outline"
+                          >
+                            <Clock className="h-3 w-3 mr-1" />
+                            Baja
+                          </Badge>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
 
                   {/* Última Interacción */}
