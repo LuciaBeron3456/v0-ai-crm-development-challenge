@@ -460,7 +460,7 @@ export function ClientList({
                       onValueChange={(value) => handlePriorityChange(client.id, value as ClientPriority)}
                     >
                       <SelectTrigger
-                        className="w-[110px] h-8 flex justify-between"
+                        className="w-[115px] h-8 flex justify-between pr-2"
                         onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
@@ -469,7 +469,7 @@ export function ClientList({
                           <span className="ml-1">{client.priority}</span>
                         </Badge>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="pr-2">
                         <SelectItem value="Alta">
                           <Badge
                             className="bg-red-100 text-red-800 border-red-200 text-xs px-2 py-0.5"
