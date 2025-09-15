@@ -36,13 +36,7 @@ export async function POST(request: NextRequest) {
     const scheduleResponse = await qstash.schedules.create({
       destination: webhookUrl,
       cron: schedule, // Cron expression for scheduling
-      body: JSON.stringify({
-        action: "check_inactive_clients",
-        daysThreshold: daysThreshold,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
+      method: "GET", // Explicitly set method to GET
     })
 
     console.log("[QSTASH] Scheduled job created:", scheduleResponse)

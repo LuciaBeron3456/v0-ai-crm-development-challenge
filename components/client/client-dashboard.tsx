@@ -78,28 +78,6 @@ export function ClientDashboard({ initialClients = [], initialTotalCount = 0, in
   const currentClients = realTimeClients !== undefined ? realTimeClients : clients
 
   // Filter and sort all clients (for stats and fallback)
-  const allFilteredClients = (currentAllClients || [])
-    .filter((client) => {
-      const matchesSearch =
-        client.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || client.telefono.includes(searchTerm)
-      const matchesStatus = statusFilter === "Todos" || client.estado === statusFilter
-      return matchesSearch && matchesStatus
-    })
-    .sort((a, b) => {
-      let comparison = 0
-
-      if (sortBy === "nombre") {
-        comparison = a.nombre.localeCompare(b.nombre)
-      } else if (sortBy === "ultimaInteraccion") {
-        comparison = b.ultimaInteraccion - a.ultimaInteraccion
-      } else if (sortBy === "priority") {
-        const priorityOrder = { Alta: 3, Media: 2, Baja: 1 }
-        comparison = priorityOrder[b.priority] - priorityOrder[a.priority]
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison
-    })
-
   // Use the filtered count from ClientList for pagination
   const filteredTotalPages = Math.ceil(filteredTotalCount / itemsPerPage)
 
